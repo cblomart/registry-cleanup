@@ -74,7 +74,7 @@ steps:
   settings:
     username: lazy
     password: pirate
-    registry: registry.mycompany.com
+    registry: http//registry.mycompany.com:9000
     repo: foo/bar
 ```
 

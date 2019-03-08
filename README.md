@@ -8,7 +8,7 @@ The registry repository name is mapped to ```DRONE_REPO```.
 
 The docker username is mapped to ```DRONE_REPO_OWNER```.
 
-The plugin will match any hexadecimal tag. That is to say that the regex used is ```[0-9A-Fa-f]+``` also refered to as commit tag.
+The plugin will match any hexadecimal tag. That is to say that the regex used is ```^[0-9A-Fa-f]+$``` also refered to as commit tag.
 
 The plugin will keep at least 3 images matching the regex.
 
@@ -74,7 +74,7 @@ steps:
   settings:
     username: lazy
     password: pirate
-    registry: registry.mycompany.com
+    registry: http//registry.mycompany.com:9000
     repo: foo/bar
 ```
 
