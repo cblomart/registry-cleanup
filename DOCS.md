@@ -1,5 +1,7 @@
 # registry-clean
 
+[![Build Status](https://cloud.drone.io/api/badges/cblomart/registry-cleanup/status.svg)](https://cloud.drone.io/cblomart/registry-cleanup)
+
 Registry Clean plugin cleans a repository in a docker registry.
 
 ## CLI
