@@ -12,6 +12,7 @@ steps:
     image: cblomart/gobasebuild
     commands:
     - go version
+    - go get ./...
     - go generate ./...
     - tags=$(git rev-parse --short HEAD)
     - if [ ! -z "$DRONE_TAG" ]; then tags="$tags,$DRONE_TAG,latest"; fi
