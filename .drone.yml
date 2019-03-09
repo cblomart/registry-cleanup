@@ -14,9 +14,6 @@ steps:
     - go version
     - go get ./...
     - go generate ./...
-    - tags=$(git rev-parse --short HEAD)
-    - if [ ! -z "$DRONE_TAG" ]; then tags="$tags,$DRONE_TAG,latest"; fi
-    - echo $tags | tee .tags
   # do the checkups
   - checkups:
     name: checks
@@ -28,3 +25,65 @@ steps:
     - golint ./...
     - ineffassign ./
     - gosec ./...
+---
+kind: pipeline
+name: build-linux
+workspace:
+  base: /go
+  path: src/github.com/cblomart/vsphere-graphite
+
+steps:
+  - dependancies:
+    name: dependancies
+    image: cblomart/gobasebuild
+    commands:
+    - go version
+    - go get ./...
+    - go generate ./...
+    - tags=$(git rev-parse --short HEAD)
+    - if [ ! -z "$DRONE_TAG" ]; then tags="$tags,$DRONE_TAG,latest"; fi
+    - echo $tags | tee .tags
+  - build:
+    name: build
+    image: cblomart/gobasebuild
+    commands:
+    - GOOS=linux GOARCH=amd64 CGO_ENABLED=0 CC=musl-gcc CCGLAGS=-static go build -ldflags '-linkmode external -s -w -extldflags "-static"' -a -o registry-cleanup
+  - upx:
+    name: upx
+    image: cblomart/gobasebuild
+    commands:
+    - upx -qq --best registry-cleanup
+    when:
+      event: [ tag ]
+  - push:
+    name: push
+    image: plugins/docker
+    settings:
+      username: cblomart
+      password:
+        from_secret: docker_password
+      repo: cblomart/registry-cleanup
+  - pack:
+    name: pack
+    image: cblomart/gobasebuild
+    commands:
+    - tar -zcf registry-cleanup registry-cleanup-linux-amd64.tgz
+    - md5sum registry-cleanup-linux-amd64.tgz | sed "s#/.*/##g" > registry-cleanup-linux-amd64.tgz.md5
+    - sha256sum registry-cleanup-linux-amd64.tgz | sed "s#/.*/##g" > registry-cleanup-linux-amd64.tgz.sha256
+    when:
+      event: [ tag ]
+  - release:
+    name: release
+    image: plugins/github-release
+    settings:
+      api_key:
+        from_secret: github_secret
+      files:
+        - registry-cleanup-linux-amd64.tgz
+        - registry-cleanup-linux-amd64.tgz.md5
+        - registry-cleanup-linux-amd64.tgz.sha256
+    when:
+      event: [ tag ]  
+
+depends_on:
+- checkups
