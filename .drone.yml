@@ -3,7 +3,7 @@ kind: pipeline
 name: checkups
 workspace:
   base: /go
-  path: src/github.com/cblomart/vsphere-graphite
+  path: src/github.com/cblomart/registry-cleanup
 
 steps:
   # check dependencies
@@ -30,7 +30,7 @@ kind: pipeline
 name: build-linux
 workspace:
   base: /go
-  path: src/github.com/cblomart/vsphere-graphite
+  path: src/github.com/cblomart/registry-cleanup
 
 steps:
   - dependancies:
@@ -47,7 +47,7 @@ steps:
     name: build
     image: cblomart/gobasebuild
     commands:
-    - GOOS=linux GOARCH=amd64 CGO_ENABLED=0 CC=musl-gcc CCGLAGS=-static go build -ldflags '-linkmode external -s -w -extldflags "-static"' -a -o registry-cleanup
+    - GOOS=linux GOARCH=amd64 CC=musl-gcc CCGLAGS=-static go build -ldflags '-linkmode external -s -w -extldflags "-static"' -a -o registry-cleanup
   - upx:
     name: upx
     image: cblomart/gobasebuild
