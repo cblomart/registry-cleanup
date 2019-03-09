@@ -1,30 +1,29 @@
-build:
-  test:
-    image: golang:1.5
-    environment:
-      - CGO_ENABLED=0
-      - GO15VENDOREXPERIMENT=1
+---
+kind: pipeline
+name: checkups
+workspace:
+  base: /go
+  path: src/github.com/cblomart/vsphere-graphite
+
+steps:
+  # check dependencies
+  - dependancies:
+    name: dependancies
+    image: cblomart/gobasebuild
     commands:
-      - go vet
-      - go test
-      - go build -ldflags "-s -w -X main.version=$DRONE_BUILD_NUMBER"
-    when:
-      event: push
-
-publish:
-  docker:
-    username: $$DOCKER_USER
-    password: $$DOCKER_PASS
-    email: $$DOCKER_EMAIL
-    repo: plugins/my-plugin
-    tag: latest
-
-plugin:
-  name: My Plugin
-  desc: Description of My Plugin
-  type: publish|deploy|notify|clone|cache
-  image: plugins/my-plugin
-  labels:
-    - label1
-    - label2
-    - label3
+    - go version
+    - go generate ./...
+    - tags=$(git rev-parse --short HEAD)
+    - if [ ! -z "$DRONE_TAG" ]; then tags="$tags,$DRONE_TAG,latest"; fi
+    - echo $tags | tee .tags
+  # do the checkups
+  - checkups:
+    name: checks
+    image: cblomart/gobasebuild
+    commands:
+    - staticcheck -f stylish ./...
+    - gofmt -s -d .
+    - go vet ./...
+    - golint ./...
+    - ineffassign ./
+    - gosec ./...

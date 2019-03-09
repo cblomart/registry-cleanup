@@ -1,5 +1,7 @@
 package main
 
+//go:generate git-version
+
 import (
 	"fmt"
 	"os"
@@ -9,14 +11,12 @@ import (
 	"github.com/urfave/cli"
 )
 
-var version string // build number set at compile-time
-
 func main() {
 	app := cli.NewApp()
 	app.Name = "registry-cleanup"
 	app.Usage = "Clean a registry repository from lingering tags/images"
 	app.Action = run
-	app.Version = version
+	app.Version = fmt.Sprintf("%s - %s (%s)", gitTag, gitShortCommit, gitStatus)
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:   "username, u",
