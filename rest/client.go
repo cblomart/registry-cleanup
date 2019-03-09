@@ -80,21 +80,49 @@ func (c *Client) do(method string, url string, payload interface{}) ([]byte, err
 }
 
 //Get does a get request
-func (c *Client) Get(url string) ([]byte, error) {
-	return c.do("GET", url, nil)
+func (c *Client) Get(url string, payload interface{}, v interface{}) error {
+	data, err := c.do("GET", url, payload)
+	if err != nil {
+		return err
+	}
+	if v != nil {
+		return json.Unmarshal(data, v)
+	}
+	return nil
 }
 
 //Head does a get request
-func (c *Client) Head(url string) ([]byte, error) {
-	return c.do("HEAD", url, nil)
+func (c *Client) Head(url string, payload interface{}, v interface{}) error {
+	data, err := c.do("HEAD", url, payload)
+	if err != nil {
+		return err
+	}
+	if v != nil {
+		return json.Unmarshal(data, v)
+	}
+	return nil
 }
 
 //Delete does a delete request
-func (c *Client) Delete(url string) ([]byte, error) {
-	return c.do("DELETE", url, nil)
+func (c *Client) Delete(url string, payload interface{}, v interface{}) error {
+	data, err := c.do("DELETE", url, payload)
+	if err != nil {
+		return err
+	}
+	if v != nil {
+		return json.Unmarshal(data, v)
+	}
+	return nil
 }
 
 //Post does a post request
-func (c *Client) Post(url string, payload interface{}) ([]byte, error) {
-	return c.do("POST", url, payload)
+func (c *Client) Post(url string, payload interface{}, v interface{}) error {
+	data, err := c.do("POST", url, payload)
+	if err != nil {
+		return err
+	}
+	if v != nil {
+		return json.Unmarshal(data, v)
+	}
+	return nil
 }

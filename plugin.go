@@ -1,14 +1,18 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
 	"regexp"
 	"sort"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/cblomart/registry-cleanup/responses/registry"
 
 	"github.com/cblomart/registry-cleanup/responses/hub"
 	"github.com/cblomart/registry-cleanup/rest"
@@ -19,6 +23,12 @@ const (
 	DefaultRegistry = "https://cloud.docker.com"
 	//HubPageSize docker hub page size
 	HubPageSize = 100
+	//RegistryAuthHeader registry authentication header
+	RegistryAuthHeader = "Www-Authenticate"
+	//Regex to  validate auth header
+	ValidAuthHeader = "^[Bb]earer *((realm|service|scope|error)=\"[A-Za-z0-9-_./:]+\",?){2,4}$"
+	//Required Registry Scope to delete tags
+	RegistryScope = "pull,push"
 )
 
 type (
@@ -198,5 +208,95 @@ func (p Plugin) ExecHub() error {
 
 //ExecRegistry executes the registry-cleanup plugin on a private registry
 func (p Plugin) ExecRegistry() error {
+	// initialize rest client
+	r := rest.NewClient()
+	// check v2
+	rawheaders, err := r.Head(fmt.Sprintf("%s/v2/", p.Registry))
+	if err != nil {
+		return fmt.Errorf("%s does not support registry v2", p.Registry)
+	}
+	// check if headers recieved
+	if len(rawheaders) == 0 {
+		return fmt.Errorf("no header revieved from registry v2 endpoint")
+	}
+	// check the authentication endpoint
+	var headers map[string][]string
+	err = json.Unmarshal(rawheaders, &headers)
+	if err != nil {
+		if p.Verbose {
+			fmt.Println(err)
+		}
+		return fmt.Errorf("could not deserialize headers")
+	}
+	// registry auth realm
+	realm := ""
+	// registry auth service
+	service := ""
+	if authheader, ok := headers[RegistryAuthHeader]; ok {
+		if len(authheader) != 1 {
+			return fmt.Errorf("more than one authentication header sent")
+		}
+		realm, service, _, err = decodeauthheader(authheader[0])
+		if err != nil {
+			return err
+		}
+	}
+	// authenticate for registry
+	userpass := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", p.Username, p.Password)))
+	r.Headers["Authorization"] = fmt.Sprintf("Basic %s", userpass)
+	data, err := r.Get(fmt.Sprintf("%s?service=%s&scope=%s:%s", realm, service, p.Repo, RegistryScope))
+	if err != nil {
+		if p.Verbose {
+			fmt.Println(err)
+		}
+		return fmt.Errorf("could not get token")
+	}
+	var token registry.TokenResp
+	err = json.Unmarshal(data, &token)
+	if err != nil {
+		if p.Verbose {
+			fmt.Println(err)
+		}
+		return fmt.Errorf("could decode token")
+	}
+	// set authentication
+	if p.Verbose {
+		fmt.Printf("authenticated with %s\n", p.Username)
+	}
+	r.Headers["Authorization"] = fmt.Sprintf("Bearer %s", token.Token)
+	// get the manifest list
+
 	return nil
+}
+
+// decode registry auth header
+func decodeauthheader(header string) (string, string, string, error) {
+	// registry auth realm
+	realm := ""
+	// registry auth service
+	service := ""
+	// registry required scope to delete tags
+	scope := "push,pull"
+	matched, err := regexp.MatchString(ValidAuthHeader, header)
+	if err != nil {
+		return realm, service, scope, fmt.Errorf("error validating auth header")
+	}
+	if !matched {
+		return realm, service, scope, fmt.Errorf("invalid auth header")
+	}
+	parts := strings.Split(header, " ")
+	rawfields := parts[len(parts)-1]
+	fields := strings.Split(rawfields, ",")
+	for _, field := range fields {
+		elements := strings.Split(field, "=")
+		switch elements[0] {
+		case "realm":
+			realm = elements[1][1 : len(elements[1])-1]
+		case "service":
+			service = elements[1][1 : len(elements[1])-1]
+		case "scope":
+			scope = elements[1][1 : len(elements[1])-1]
+		}
+	}
+	return realm, service, scope, nil
 }
