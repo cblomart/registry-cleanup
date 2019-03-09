@@ -73,7 +73,10 @@ func main() {
 			EnvVar: "PLUGIN_DUMP",
 		},
 	}
-	app.Run(os.Args)
+	err := app.Run(os.Args)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %s", err)
+	}
 }
 
 func run(c *cli.Context) {
