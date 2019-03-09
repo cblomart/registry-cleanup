@@ -19,17 +19,17 @@ func main() {
 	app.Version = version
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name:   "username",
+			Name:   "username, u",
 			Usage:  "Docker username",
 			EnvVar: "PLUGIN_USERNAME,DRONE_REPO_OWNER",
 		},
 		cli.StringFlag{
-			Name:   "password",
+			Name:   "password, p",
 			Usage:  "Docker password",
 			EnvVar: "PLUGIN_PASSWORD",
 		},
 		cli.StringFlag{
-			Name:   "repo",
+			Name:   "repo, r",
 			Usage:  "Repository to target",
 			EnvVar: "PLUGIN_REPO,DRONE_REPO",
 		},
@@ -46,13 +46,13 @@ func main() {
 			EnvVar: "PLUGIN_REGEX",
 		},
 		cli.IntFlag{
-			Name:   "min",
+			Name:   "min, m",
 			Value:  3,
 			Usage:  "Minimum number of tags/images to keep",
 			EnvVar: "PLUGIN_MIN",
 		},
 		cli.DurationFlag{
-			Name:   "max",
+			Name:   "max, M",
 			Value:  360 * time.Hour,
 			Usage:  "Maximum age of tags/images",
 			EnvVar: "PLUGIN_MAX",
