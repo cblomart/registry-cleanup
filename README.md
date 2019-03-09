@@ -6,7 +6,7 @@ Registry Clean plugin cleans a repository in a docker registry.
 
 Bellow the help when used on commandline
 
-```bash
+```
 $ registry-cleanup --help
 NAME:
    registry-cleanup - Clean a registry repository from lingering tags/images
@@ -18,16 +18,16 @@ COMMANDS:
      help, h  Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
-   --username value, -u value  Docker username [%PLUGIN_USERNAME%, %DRONE_REPO_OWNER%]
-   --password value, -p value  Docker password [%PLUGIN_PASSWORD%]
-   --repo value, -r value      Repository to target [%PLUGIN_REPO%, %DRONE_REPO%]
-   --registry value            Registry to target (default: "https://cloud.docker.com") [%PLUGIN_REGISTRY%]
-   --regex value               Clean Tags that match regex (default: "^[0-9A-Fa-f]+$") [%PLUGIN_REGEX%]
-   --min value, -m value       Minimum number of tags/images to keep (default: 3) [%PLUGIN_MIN%]
-   --max value, -M value       Maximum age of tags/images (default: 360h0m0s) [%PLUGIN_MAX%]
-   --verbose                   Show verbose information [%PLUGIN_VERBOSE%]
-   --dryrun                    Dry run [%PLUGIN_DRYRUN%]
-   --dump                      Dump network requests [%PLUGIN_DUMP%]
+   --username value, -u value  Docker username [$PLUGIN_USERNAME, $DRONE_REPO_OWNER]
+   --password value, -p value  Docker password [$PLUGIN_PASSWORD]
+   --repo value, -r value      Repository to target [$PLUGIN_REPO, $DRONE_REPO]
+   --registry value            Registry to target (default: "https://cloud.docker.com") [$PLUGIN_REGISTRY]
+   --regex value               Clean Tags that match regex (default: "^[0-9A-Fa-f]+$") [$PLUGIN_REGEX]
+   --min value, -m value       Minimum number of tags/images to keep (default: 3) [$PLUGIN_MIN]
+   --max value, -M value       Maximum age of tags/images (default: 360h0m0s) [$PLUGIN_MAX]
+   --verbose                   Show verbose information [$PLUGIN_VERBOSE]
+   --dryrun                    Dry run [$PLUGIN_DRYRUN]
+   --dump                      Dump network requests [$PLUGIN_DUMP]
    --help, -h                  show help
    --version, -v               print the version
 ```
