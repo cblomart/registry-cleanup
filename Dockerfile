@@ -12,9 +12,9 @@ LABEL maintainer="cblomart@gmail.com"
 COPY --from=builder /etc/passwd /etc/passwd
 # copy ca-certificates 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-# copy vsphere-graphite
+# copy registry-cleanup
 COPY ./registry-cleanup /registry-cleanup
-# run as vpshere-graphite-user
+# run as registry-cleanup-user
 USER registry-cleanup-user
-# start vsphere-graphite
+# start registry-cleanup
 ENTRYPOINT [ "/registry-cleanup" ] 
