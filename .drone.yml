@@ -67,7 +67,7 @@ steps:
     name: pack
     image: cblomart/gobasebuild
     commands:
-    - tar -zcf registry-cleanup registry-cleanup-linux-amd64.tgz
+    - tar -zcf registry-cleanup-linux-amd64.tgz registry-cleanup
     - md5sum registry-cleanup-linux-amd64.tgz | sed "s#/.*/##g" > registry-cleanup-linux-amd64.tgz.md5
     - sha256sum registry-cleanup-linux-amd64.tgz | sed "s#/.*/##g" > registry-cleanup-linux-amd64.tgz.sha256
     when:
