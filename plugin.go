@@ -23,12 +23,6 @@ const (
 	DefaultRegistry = "https://cloud.docker.com"
 	//HubPageSize docker hub page size
 	HubPageSize = 100
-	//RegistryAuthHeader registry authentication header
-	RegistryAuthHeader = "Www-Authenticate"
-	//Regex to  validate auth header
-	ValidAuthHeader = "^[Bb]earer *((realm|service|scope|error)=\"[A-Za-z0-9-_./:]+\",?){2,4}$"
-	//Required Registry Scope to delete tags
-	RegistryScope = "pull,push"
 )
 
 type (
@@ -43,6 +37,14 @@ type (
 		Max      time.Duration
 		Verbose  bool
 		DryRun   bool
+		Dump     bool
+	}
+
+	//Tag tag data
+	Tag struct {
+		Name    string
+		Created time.Time
+		Digest  string
 	}
 )
 
@@ -108,22 +110,15 @@ func (p Plugin) ExecHub() error {
 	// get the base url
 	baseurl := fmt.Sprintf("%s/v2/", p.Registry)
 	// initialize rest client
-	r := rest.NewClient()
+	r := rest.NewClient(p.Dump)
 	// get a token
-	data, err := r.Post(fmt.Sprintf("%susers/login/", baseurl), map[string]string{"username": p.Username, "password": p.Password})
+	var token hub.Token
+	err := r.Post(fmt.Sprintf("%susers/login/", baseurl), map[string]string{"username": p.Username, "password": p.Password}, &token)
 	if err != nil {
 		if p.Verbose {
 			fmt.Println(err)
 		}
 		return fmt.Errorf("could not get token")
-	}
-	var token hub.Token
-	err = json.Unmarshal(data, &token)
-	if err != nil {
-		if p.Verbose {
-			fmt.Println(err)
-		}
-		return fmt.Errorf("cannot read token from response")
 	}
 	if p.Verbose {
 		fmt.Printf("authenticated with %s\n", p.Username)
@@ -132,25 +127,19 @@ func (p Plugin) ExecHub() error {
 	// get the tag list
 	var tags []hub.Tag
 	re := regexp.MustCompile(p.Regex)
+	url := fmt.Sprintf("%srepositories/%s/tags/?page_size=%d&page=%d", baseurl, p.Repo, HubPageSize, 1)
 	var tagpage hub.Tags
-	tagpage.Next = fmt.Sprintf("%srepositories/%s/tags/?page_size=%d&page=%d", baseurl, p.Repo, HubPageSize, 1)
 	// loop trought the result pages
-	for len(tagpage.Next) > 0 {
-		data, err = r.Get(tagpage.Next)
+	for len(url) > 0 {
+		tagpage = hub.Tags{}
+		err = r.Get(url, nil, &tagpage)
 		if err != nil {
 			if p.Verbose {
 				fmt.Println(err)
 			}
 			return fmt.Errorf("cannot get tag page")
 		}
-		tagpage = hub.Tags{}
-		err = json.Unmarshal(data, &tagpage)
-		if err != nil {
-			if p.Verbose {
-				fmt.Println(err)
-			}
-			return fmt.Errorf("cannot read tag page response")
-		}
+		url = tagpage.Next
 		for _, tag := range tagpage.Results {
 			if !re.MatchString(tag.Name) || tag.Name == "latest" {
 				continue
@@ -168,7 +157,8 @@ func (p Plugin) ExecHub() error {
 	// parse the tags in reverse order to decice which to delete
 	treshold := time.Now().Add(-p.Max)
 	var wg sync.WaitGroup
-	deleting := false
+	deleted := 0
+	errors := 0
 	for i := len(tags) - 1; i >= 0; i-- {
 		// stop if reached the minimum limit
 		if i <= p.Min-1 {
@@ -178,61 +168,54 @@ func (p Plugin) ExecHub() error {
 		if tags[i].LastUpdated.Before(treshold) {
 			wg.Add(1)
 			// update the deleting flag
-			if !deleting {
-				deleting = true
-			}
 			// send the delete request async
 			go func(tag hub.Tag) {
 				defer wg.Done()
 				if p.DryRun {
-					fmt.Printf("%s:%s (%s) would be deleted\n", p.Repo, tag.Name, tag.LastUpdated.Format(time.RFC822))
+					fmt.Printf("dryrun [%s] %s:%s\n", tag.LastUpdated.Format(time.RFC822), p.Repo, tag.Name)
+					errors++
 					return
 				}
-				_, err := r.Delete(fmt.Sprintf("%srepositories/%s/tags/%s/", baseurl, p.Repo, tag.Name))
+				err := r.Delete(fmt.Sprintf("%srepositories/%s/tags/%s/", baseurl, p.Repo, tag.Name), nil, nil)
 				if err != nil {
 					if p.Verbose {
 						fmt.Println(err)
 					}
-					fmt.Fprintf(os.Stderr, "%s:%s (%s) error deleting\n", p.Repo, tag.Name, tag.LastUpdated.Format(time.RFC822))
+					fmt.Fprintf(os.Stderr, "error [%s] %s:%s\n", tag.LastUpdated.Format(time.RFC822), p.Repo, tag.Name)
+					errors++
+					return
 				}
-				fmt.Printf("%s:%s (%s) deleted\n", p.Repo, tag.Name, tag.LastUpdated.Format(time.RFC822))
+				deleted++
+				fmt.Printf("deleted [%s] %s:%s\n", tag.LastUpdated.Format(time.RFC822), p.Repo, tag.Name)
 			}(tags[i])
 		}
 	}
-	// if deleting woit for the results
-	if deleting {
-		wg.Wait()
+	// wait for the results
+	wg.Wait()
+	if errors > 0 {
+		fmt.Printf("issue deleting %d tags/images\n", errors)
 	}
+	fmt.Printf("successfully deleted %d tags/images\n", deleted)
 	return nil
 }
 
 //ExecRegistry executes the registry-cleanup plugin on a private registry
 func (p Plugin) ExecRegistry() error {
+	// set the base url
+	baseurl := fmt.Sprintf("%s/v2/", p.Registry)
 	// initialize rest client
-	r := rest.NewClient()
+	r := rest.NewClient(p.Dump)
 	// check v2
-	rawheaders, err := r.Head(fmt.Sprintf("%s/v2/", p.Registry))
+	var headers map[string][]string
+	err := r.Head(baseurl, nil, &headers)
 	if err != nil {
 		return fmt.Errorf("%s does not support registry v2", p.Registry)
-	}
-	// check if headers recieved
-	if len(rawheaders) == 0 {
-		return fmt.Errorf("no header revieved from registry v2 endpoint")
-	}
-	// check the authentication endpoint
-	var headers map[string][]string
-	err = json.Unmarshal(rawheaders, &headers)
-	if err != nil {
-		if p.Verbose {
-			fmt.Println(err)
-		}
-		return fmt.Errorf("could not deserialize headers")
 	}
 	// registry auth realm
 	realm := ""
 	// registry auth service
 	service := ""
-	if authheader, ok := headers[RegistryAuthHeader]; ok {
+	if authheader, ok := headers[registry.AuthHeader]; ok {
 		if len(authheader) != 1 {
 			return fmt.Errorf("more than one authentication header sent")
 		}
@@ -244,28 +227,165 @@ func (p Plugin) ExecRegistry() error {
 	// authenticate for registry
 	userpass := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", p.Username, p.Password)))
 	r.Headers["Authorization"] = fmt.Sprintf("Basic %s", userpass)
-	data, err := r.Get(fmt.Sprintf("%s?service=%s&scope=%s:%s", realm, service, p.Repo, RegistryScope))
+	var token registry.TokenResp
+	err = r.Get(fmt.Sprintf("%s?service=%s&scope=repository:%s:%s", realm, service, p.Repo, registry.Scope), nil, &token)
 	if err != nil {
 		if p.Verbose {
 			fmt.Println(err)
 		}
 		return fmt.Errorf("could not get token")
 	}
-	var token registry.TokenResp
-	err = json.Unmarshal(data, &token)
-	if err != nil {
-		if p.Verbose {
-			fmt.Println(err)
-		}
-		return fmt.Errorf("could decode token")
-	}
 	// set authentication
 	if p.Verbose {
 		fmt.Printf("authenticated with %s\n", p.Username)
 	}
 	r.Headers["Authorization"] = fmt.Sprintf("Bearer %s", token.Token)
-	// get the manifest list
+	// get the tags list
+	var tags registry.TagsListResp
+	err = r.Get(fmt.Sprintf("%s%s/tags/list", baseurl, p.Repo), nil, &tags)
+	if err != nil {
+		if p.Verbose {
+			fmt.Println(err)
+		}
+		return fmt.Errorf("could not get tag list")
+	}
+	// filter tags list
+	var scopedTags []string
+	re := regexp.MustCompile(p.Regex)
+	for _, tag := range tags.Tags {
+		if !re.MatchString(tag) || tag == "latest" {
+			continue
+		}
+		scopedTags = append(scopedTags, tag)
 
+	}
+	if p.Verbose {
+		fmt.Printf("found %d tags/images\n", len(scopedTags))
+	}
+	// set mime type for manifests
+	r.Headers["Accept"] = registry.ManifestMimeV2
+	// get informations on scoped tags
+	var tagInfos []Tag
+	var wg sync.WaitGroup
+	wg.Add(len(scopedTags))
+	for _, tag := range scopedTags {
+		go func(tag string) {
+			// defer completion
+			defer wg.Done()
+			// check version of the manifest
+			var headers map[string][]string
+			err := r.Head(fmt.Sprintf("%s%s/manifests/%s", baseurl, p.Repo, tag), nil, &headers)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "could not head manifest: %s\n", err)
+				return
+			}
+			// get the digest from headers
+			digest := ""
+			if digests, ok := headers[registry.DigestHeader]; ok {
+				digest = digests[0]
+			}
+			if len(digest) == 0 {
+				fmt.Fprintf(os.Stderr, "no digest for manifest: %s\n", tag)
+				return
+			}
+			// check manifest in function of version
+			if mimetype, ok := headers["Content-Type"]; ok {
+				switch mimetype[0] {
+				case registry.ManifestMimeV2:
+					var manifest registry.ManifestRespV2
+					err = r.Get(fmt.Sprintf("%s%s/manifests/%s", baseurl, p.Repo, tag), nil, &manifest)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "could not get manifest: %s\n", err)
+						return
+					}
+					var image registry.Image
+					err = r.Get(fmt.Sprintf("%s%s/blobs/%s", baseurl, p.Repo, manifest.Config.Digest), nil, &image)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "could not get config blob: %s\n", err)
+						return
+					}
+					tagInfos = append(tagInfos, Tag{Name: tag, Created: image.Created, Digest: digest})
+				case registry.ManifestMimeV1:
+					// get the manifest
+					var manifest registry.ManifestRespV1
+					err = r.Get(fmt.Sprintf("%s%s/manifests/%s", baseurl, p.Repo, tag), nil, &manifest)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "could not get manifest: %s\n", err)
+						return
+					}
+					// get all images informations and check for the latest
+					images := make([]registry.Image, len(manifest.History))
+					latest := -1
+					for i, h := range manifest.History {
+						err = json.Unmarshal([]byte(h.V1Compatibility), &images[i])
+						if err != nil {
+							fmt.Fprintf(os.Stderr, "could not decode image from history: %s\n", err)
+							continue
+						}
+						if latest == -1 {
+							latest = i
+							continue
+						}
+						if images[i].Created.After(images[latest].Created) {
+							latest = i
+						}
+					}
+					tagInfos = append(tagInfos, Tag{Name: tag, Created: images[latest].Created, Digest: digest})
+				default:
+					fmt.Printf("manifest type not handled for %s: %s\n", tag, mimetype[0])
+				}
+			}
+		}(tag)
+	}
+	wg.Wait()
+	// indicate the details found
+	if p.Verbose {
+		fmt.Printf("found details on %d tags/images\n", len(tagInfos))
+	}
+	// order tags infos per date (newer to older)
+	sort.SliceStable(tagInfos, func(i, j int) bool {
+		return tagInfos[i].Created.After(tagInfos[j].Created)
+	})
+	// parse the tags in reverse order to decice which to delete
+	treshold := time.Now().Add(-p.Max)
+	errors := 0
+	deleted := 0
+	for i := len(tagInfos) - 1; i >= 0; i-- {
+		// stop if reached the minimum limit
+		if i <= p.Min-1 {
+			break
+		}
+		// delete if older than treshold
+		if tagInfos[i].Created.Before(treshold) {
+			wg.Add(1)
+			// send the delete request async
+			go func(tag Tag) {
+				defer wg.Done()
+				if p.DryRun {
+					fmt.Printf("dryrun [%s] %s:%s\n", tag.Created.Format(time.RFC822), p.Repo, tag.Name)
+					errors++
+					return
+				}
+				err := r.Delete(fmt.Sprintf("%s%s/manifests/%s", baseurl, p.Repo, tag.Digest), nil, nil)
+				if err != nil {
+					if p.Verbose {
+						fmt.Println(err)
+					}
+					fmt.Fprintf(os.Stderr, "error [%s] %s:%s\n", tag.Created.Format(time.RFC822), p.Repo, tag.Name)
+					errors++
+					return
+				}
+				deleted++
+				fmt.Printf("deleted [%s] %s:%s\n", tag.Created.Format(time.RFC822), p.Repo, tag.Name)
+			}(tagInfos[i])
+		}
+	}
+	// if deleting wait for the results
+	wg.Wait()
+	if errors > 0 {
+		fmt.Printf("issue deleting %d tags/images\n", errors)
+	}
+	fmt.Printf("successfully deleted %d tags/images\n", deleted)
 	return nil
 }
 
@@ -276,8 +396,8 @@ func decodeauthheader(header string) (string, string, string, error) {
 	// registry auth service
 	service := ""
 	// registry required scope to delete tags
-	scope := "push,pull"
-	matched, err := regexp.MatchString(ValidAuthHeader, header)
+	scope := registry.Scope
+	matched, err := regexp.MatchString(registry.ValidAuthHeader, header)
 	if err != nil {
 		return realm, service, scope, fmt.Errorf("error validating auth header")
 	}

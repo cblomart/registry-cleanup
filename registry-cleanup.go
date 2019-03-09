@@ -66,8 +66,13 @@ func main() {
 			Name:   "dryrun",
 			Usage:  "Dry run",
 			EnvVar: "PLUGIN_DRYRUN",
-		}}
-
+		},
+		cli.BoolFlag{
+			Name:   "dump",
+			Usage:  "Dump network requests",
+			EnvVar: "PLUGIN_DUMP",
+		},
+	}
 	app.Run(os.Args)
 }
 
@@ -82,6 +87,7 @@ func run(c *cli.Context) {
 		Max:      c.Duration("max"),
 		Verbose:  c.Bool("verbose"),
 		DryRun:   c.Bool("dryrun"),
+		Dump:     c.Bool("dump"),
 	}
 
 	if err := plugin.Exec(); err != nil {
