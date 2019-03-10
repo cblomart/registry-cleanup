@@ -87,3 +87,197 @@ steps:
 
 depends_on:
 - checkups
+
+---
+kind: pipeline
+name: build-arm
+workspace:
+  base: /go
+  path: src/github.com/cblomart/registry-cleanup
+
+steps:
+  - dependancies:
+    name: dependancies
+    image: cblomart/gobasebuild
+    commands:
+    - go version
+    - go get ./...
+    - go generate ./...
+    - tags=$(git rev-parse --short HEAD)
+    - if [ ! -z "$DRONE_TAG" ]; then tags="$tags,$DRONE_TAG,latest"; fi
+    - echo $tags | tee .tags
+  - build:
+    name: build
+    image: cblomart/gobasebuild
+    commands:
+    - GOOS=linux GOARCH=arm CGOENABLED=0 go build -ldflags '-s' -a -o registry-cleanup
+  - upx:
+    name: upx
+    image: cblomart/gobasebuild
+    commands:
+    - upx -qq --best registry-cleanup
+  - push:
+    name: push
+    image: plugins/docker
+    settings:
+      username: cblomart
+      password:
+        from_secret: docker_password
+      repo: cblomart/rpi-registry-cleanup
+  - pack:
+    name: pack
+    image: cblomart/gobasebuild
+    commands:
+    - tar -zcf registry-cleanup-linux-arm.tgz registry-cleanup
+    - md5sum registry-cleanup-linux-arm.tgz | sed "s#/.*/##g" > registry-cleanup-linux-arm.tgz.md5
+    - sha256sum registry-cleanup-linux-arm.tgz | sed "s#/.*/##g" > registry-cleanup-linux-arm.tgz.sha256
+  - release:
+    name: release
+    image: plugins/github-release
+    settings:
+      api_key:
+        from_secret: github_secret
+      files:
+        - registry-cleanup-linux-arm.tgz
+        - registry-cleanup-linux-arm.tgz.md5
+        - registry-cleanup-linux-arm.tgz.sha256
+
+trigger:
+  event: [ tag ]
+
+depends_on:
+  - checkups
+
+---
+kind: pipeline
+name: build-windows
+workspace:
+  base: /go
+  path: src/github.com/cblomart/registry-cleanup
+
+steps:
+  - dependancies:
+    name: dependancies
+    image: cblomart/gobasebuild
+    commands:
+    - go version
+    - go get ./...
+    - go generate ./...
+    - tags=$(git rev-parse --short HEAD)
+    - if [ ! -z "$DRONE_TAG" ]; then tags="$tags,$DRONE_TAG,latest"; fi
+    - echo $tags | tee .tags
+  - build:
+    name: build
+    image: cblomart/gobasebuild
+    commands:
+    - GOOS=windows GOARCH=amd64 CGOENABLED=0 go build -ldflags '-s' -a -o registry-cleanup.exe
+  - upx:
+    name: upx
+    image: cblomart/gobasebuild
+    commands:
+    - upx -qq --best registry-cleanup.exe
+  - pack:
+    name: pack
+    image: cblomart/gobasebuild
+    commands:
+    - tar -zcf registry-cleanup-windows-amd64.tgz registry-cleanup.exe
+    - md5sum registry-cleanup-windows-amd64.tgz | sed "s#/.*/##g" > registry-cleanup-windows-amd64.tgz.md5
+    - sha256sum registry-cleanup-windows-amd64.tgz | sed "s#/.*/##g" > registry-cleanup-windows-amd64.tgz.sha256
+  - release:
+    name: release
+    image: plugins/github-release
+    settings:
+      api_key:
+        from_secret: github_secret
+      files:
+        - registry-cleanup-windows-amd64.tgz
+        - registry-cleanup-windows-amd64.tgz.md5
+        - registry-cleanup-windows-amd64.tgz.sha256
+
+trigger:
+  event: [ tag ]
+
+depends_on:
+  - checkups
+
+---
+kind: pipeline
+name: build-darwin
+workspace:
+  base: /go
+  path: src/github.com/cblomart/registry-cleanup
+
+steps:
+  - dependancies:
+    name: dependancies
+    image: cblomart/gobasebuild
+    commands:
+    - go version
+    - go get ./...
+    - go generate ./...
+    - tags=$(git rev-parse --short HEAD)
+    - if [ ! -z "$DRONE_TAG" ]; then tags="$tags,$DRONE_TAG,latest"; fi
+    - echo $tags | tee .tags
+  - build:
+    name: build
+    image: cblomart/gobasebuild
+    commands:
+    - GOOS=darwin GOARCH=amd64 CGOENABLED=0 go build -ldflags '-s' -a -o registry-cleanup
+  - upx:
+    name: upx
+    image: cblomart/gobasebuild
+    commands:
+    - upx -qq --best registry-cleanup
+  - pack:
+    name: pack
+    image: cblomart/gobasebuild
+    commands:
+    - tar -zcf registry-cleanup-darwin-amd64.tgz registry-cleanup
+    - md5sum registry-cleanup-darwin-amd64.tgz | sed "s#/.*/##g" > registry-cleanup-darwin-amd64.tgz.md5
+    - sha256sum registry-cleanup-darwin-amd64.tgz | sed "s#/.*/##g" > registry-cleanup-darwin-amd64.tgz.sha256
+  - release:
+    name: release
+    image: plugins/github-release
+    settings:
+      api_key:
+        from_secret: github_secret
+      files:
+        - registry-cleanup-darwin-amd64.tgz
+        - registry-cleanup-darwin-amd64.tgz.md5
+        - registry-cleanup-darwin-amd64.tgz.sha256
+
+trigger:
+  event: [ tag ]
+
+depends_on:
+  - checkups
+
+  
+---
+kind: pipeline
+name: cleanup
+workspace:
+  base: /go
+  path: src/github.com/cblomart/vsphere-graphite
+
+clone:
+  disable: true
+
+steps:
+  - cleanup-docker:
+    name: cleanup docker
+    image: cblomart/registry-cleanup
+    settings:
+      password:
+        from_secret: docker_password
+      
+depends_on:
+  - build-linux
+  - build-arm
+  - build-windows
+  - build-darwin
+
+trigger:
+  status:
+  - success
+  - failure
