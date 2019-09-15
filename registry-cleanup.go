@@ -60,6 +60,11 @@ func main() {
 			Usage:  "Registry to target",
 			EnvVar: "PLUGIN_REGISTRY",
 		},
+		cli.BoolFlag{
+			Name:   "insecure, i",
+			Usage:  "Skip TLS verification",
+			EnvVar: "PLUGIN_INSECURE",
+		},
 		cli.StringFlag{
 			Name:   "regex",
 			Value:  "^[0-9A-Fa-f]+$",
@@ -106,6 +111,7 @@ func run(c *cli.Context) {
 		Password: c.String("password"),
 		Repo:     c.String("repo"),
 		Registry: c.String("registry"),
+		Insecure: c.Bool("insecure"),
 		Regex:    c.String("regex"),
 		Min:      c.Int("min"),
 		Max:      c.Duration("max"),

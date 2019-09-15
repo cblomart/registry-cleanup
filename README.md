@@ -24,6 +24,7 @@ GLOBAL OPTIONS:
    --password value, -p value  Docker password [$PLUGIN_PASSWORD]
    --repo value, -r value      Repository to target [$PLUGIN_REPO, $DRONE_REPO]
    --registry value            Registry to target (default: "https://cloud.docker.com") [$PLUGIN_REGISTRY]
+   --insecure                  Skip TLS verification [$PLUGIN_INSECURE]
    --regex value               Clean Tags that match regex (default: "^[0-9A-Fa-f]+$") [$PLUGIN_REGEX]
    --min value, -m value       Minimum number of tags/images to keep (default: 3) [$PLUGIN_MIN]
    --max value, -M value       Maximum age of tags/images (default: 360h0m0s) [$PLUGIN_MAX]

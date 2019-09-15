@@ -16,6 +16,7 @@ package rest
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -38,9 +39,13 @@ type Client struct {
 }
 
 //NewClient create a rest client
-func NewClient(dump bool) *Client {
+func NewClient(dump bool, insecure bool) *Client {
+	client := &http.Client{}
+	if insecure {
+		client.Transport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
 	return &Client{
-		client:  &http.Client{},
+		client:  client,
 		Headers: map[string]string{},
 		Dump:    dump,
 	}

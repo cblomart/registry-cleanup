@@ -46,6 +46,7 @@ type (
 		Password string
 		Repo     string
 		Registry string
+		Insecure bool
 		Regex    string
 		Min      int
 		Max      time.Duration
@@ -124,7 +125,7 @@ func (p Plugin) ExecHub() error {
 	// get the base url
 	baseurl := fmt.Sprintf("%s/v2/", p.Registry)
 	// initialize rest client
-	r := rest.NewClient(p.Dump)
+	r := rest.NewClient(p.Dump, p.Insecure)
 	// get a token
 	var token hub.Token
 	err := r.Post(fmt.Sprintf("%susers/login/", baseurl), map[string]string{"username": p.Username, "password": p.Password}, &token)
@@ -218,7 +219,7 @@ func (p Plugin) ExecRegistry() error {
 	// set the base url
 	baseurl := fmt.Sprintf("%s/v2/", p.Registry)
 	// initialize rest client
-	r := rest.NewClient(p.Dump)
+	r := rest.NewClient(p.Dump, p.Insecure)
 	// check v2
 	var headers map[string][]string
 	err := r.Head(baseurl, nil, &headers)
