@@ -41,6 +41,7 @@ type Client struct {
 //NewClient create a rest client
 func NewClient(dump bool, insecure bool) *Client {
 	client := &http.Client{}
+	/* #nosec */
 	if insecure {
 		client.Transport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
