@@ -32,11 +32,7 @@ func main() {
 	app.Action = run
 	app.Version = fmt.Sprintf("%s - %s (%s)", gitTag, gitShortCommit, gitStatus)
 	app.Authors = []cli.Author{
-		cli.Author
-		{
-			Name:  "Cédric Blomart",
-			Email: "cblomart@gmail.com",
-		},
+		cli.Author{Name: "Cédric Blomart", Email: "cblomart@gmail.com"},
 	}
 	app.Copyright = "Copyright (c) 2019 cblomart"
 	app.Flags = []cli.Flag{
