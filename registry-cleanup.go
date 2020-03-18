@@ -102,7 +102,7 @@ func main() {
 	}
 }
 
-func run(c *cli.Context) {
+func run(c *cli.Context) error {
 	plugin := Plugin{
 		Username: c.String("username"),
 		Password: c.String("password"),
@@ -117,8 +117,5 @@ func run(c *cli.Context) {
 		Dump:     c.Bool("dump"),
 	}
 
-	if err := plugin.Exec(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	return plugin.Exec()
 }
