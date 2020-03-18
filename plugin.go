@@ -34,7 +34,7 @@ import (
 
 const (
 	//DefaultRegistry is the default value for the registry
-	DefaultRegistry = "https://cloud.docker.com"
+	DefaultRegistry = "https://hub.docker.com"
 	//HubPageSize docker hub page size
 	HubPageSize = 100
 )
