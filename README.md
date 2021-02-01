@@ -14,7 +14,7 @@ NAME:
    registry-cleanup - Clean a registry repository from lingering tags/images
 
 USAGE:
-   registry-cleanup.exe [global options] command [command options] [arguments...]
+   registry-cleanup [global options] command [command options] [arguments...]
 
 COMMANDS:
      help, h  Shows a list of commands or help for one command
